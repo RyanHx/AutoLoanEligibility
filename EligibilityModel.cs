@@ -2,7 +2,7 @@
 
 namespace AutoLoanEligibility
 {
-    public partial class Temperatures
+    public partial class EligibilityModel
     {
         [JsonProperty("layerType")]
         public string LayerType { get; set; }

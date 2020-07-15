@@ -50,7 +50,7 @@ namespace AutoLoanEligibility
                         break;
                     }
 
-                    Temperatures json = JsonConvert.DeserializeObject<Temperatures>(response.Content.ReadAsStringAsync().GetAwaiter().GetResult());
+                    EligibilityModel json = JsonConvert.DeserializeObject<EligibilityModel>(response.Content.ReadAsStringAsync().GetAwaiter().GetResult());
                     if (json.EligibilityResult.Equals("InEligible"))
                     {
                         ineligibleSheet.CreateRow(ineligibleRow).CreateCell(0).SetCellValue(address);
