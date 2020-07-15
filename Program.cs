@@ -44,7 +44,7 @@ namespace AutoLoanEligibility
                     HttpResponseMessage response = client.GetAsync("https://eligibility.sc.egov.usda.gov/eligibility/MapAddressVerification?address=" + address + "&whichapp=RBSIELG").GetAwaiter().GetResult();
                     if (!response.IsSuccessStatusCode)
                     {
-                        Console.WriteLine("Connection error. Too many requests?");
+                        Console.WriteLine($"Connection error:\nStatus code: {response.StatusCode}\nMessage: {response.ReasonPhrase}");
                         Console.WriteLine($"Failed on: {address}");
                         Console.WriteLine("Writing current results...");
                         break;
