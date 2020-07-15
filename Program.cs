@@ -74,7 +74,7 @@ namespace AutoLoanEligibility
             workbook.Write(fs);
             fs.Close();
             Console.WriteLine("Task complete");
-            Console.WriteLine($"Output directory: {AppDomain.CurrentDomain.BaseDirectory}output.xlsx");
+            Console.WriteLine($"Output directory: {Directory.GetCurrentDirectory()}\\output.xlsx");
             Console.WriteLine("Press any key to close this window...");
             Console.ReadKey();
         }
