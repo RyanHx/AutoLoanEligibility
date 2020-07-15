@@ -1,6 +1,9 @@
-﻿using Newtonsoft.Json;
+﻿using CsvHelper;
+using Newtonsoft.Json;
 using NPOI.XSSF.UserModel;
 using System;
+using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Net.Http;
 using System.Threading;
@@ -25,27 +28,26 @@ namespace AutoLoanEligibility
             var unableSheet = workbook.CreateSheet("UnableToDetermine");
 
             using (StreamReader sr = new StreamReader(csvPath))
+            using (var csv = new CsvReader(sr, CultureInfo.InvariantCulture))
             {
-                var address = sr.ReadLine();
+                csv.Configuration.HasHeaderRecord = false;
+                var records = csv.GetRecords<CsvEntry>();
+                #region Excel output row numbers
                 int eligibleRow = 0;
                 int ineligibleRow = 0;
                 int unableRow = 0;
                 int total = 1;
+                #endregion
 
-                while (address != null)
+                foreach (var record in records)
                 {
                     Console.WriteLine($"Checking address {total}");
-                    if (address.StartsWith('"'))
-                    {
-                        address = address.Substring(1, address.Length - 2);
-                    }
-
-                    Thread.Sleep(TimeSpan.FromSeconds(2));
-                    HttpResponseMessage response = client.GetAsync("https://eligibility.sc.egov.usda.gov/eligibility/MapAddressVerification?address=" + address + "&whichapp=RBSIELG").GetAwaiter().GetResult();
+                    Thread.Sleep(TimeSpan.FromSeconds(2)); // Prevent spamming requests
+                    HttpResponseMessage response = client.GetAsync("https://eligibility.sc.egov.usda.gov/eligibility/MapAddressVerification?address=" + record.Address + "&whichapp=RBSIELG").GetAwaiter().GetResult();
                     if (!response.IsSuccessStatusCode)
                     {
                         Console.WriteLine($"Connection error:\nStatus code: {response.StatusCode}\nMessage: {response.ReasonPhrase}");
-                        Console.WriteLine($"Failed on: {address}");
+                        Console.WriteLine($"Failed on: {record.Address}");
                         Console.WriteLine("Writing current results...");
                         break;
                     }
@@ -53,24 +55,28 @@ namespace AutoLoanEligibility
                     EligibilityModel json = JsonConvert.DeserializeObject<EligibilityModel>(response.Content.ReadAsStringAsync().GetAwaiter().GetResult());
                     if (json.EligibilityResult.Equals("InEligible"))
                     {
-                        ineligibleSheet.CreateRow(ineligibleRow).CreateCell(0).SetCellValue(address);
+                        var row = ineligibleSheet.CreateRow(ineligibleRow);
+                        row.CreateCell(0).SetCellValue(record.CompanyName);
+                        row.CreateCell(1).SetCellValue(record.Address);
                         ineligibleRow++;
                     }
                     else if (json.EligibilityResult.Equals("UnableToDetermine"))
                     {
-                        unableSheet.CreateRow(unableRow).CreateCell(0).SetCellValue(address);
+                        var row = unableSheet.CreateRow(unableRow);
+                        row.CreateCell(0).SetCellValue(record.CompanyName);
+                        row.CreateCell(1).SetCellValue(record.Address);
                         unableRow++;
                     }
                     else
                     {
-                        eligibleSheet.CreateRow(eligibleRow).CreateCell(0).SetCellValue(address);
+                        var row = eligibleSheet.CreateRow(eligibleRow);
+                        row.CreateCell(0).SetCellValue(record.CompanyName);
+                        row.CreateCell(1).SetCellValue(record.Address);
                         eligibleRow++;
                     }
-                    address = sr.ReadLine();
                     total++;
                 }
-
-            }
+            }          
             FileStream fs = File.Create("output.xlsx");
             workbook.Write(fs);
             fs.Close();
