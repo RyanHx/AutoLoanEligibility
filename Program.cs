@@ -45,6 +45,7 @@ namespace AutoLoanEligibility
                     if (!response.IsSuccessStatusCode)
                     {
                         Console.WriteLine("Connection error. Too many requests?");
+                        Console.WriteLine($"Failed on: {address}");
                         Console.WriteLine("Writing current results...");
                         break;
                     }
