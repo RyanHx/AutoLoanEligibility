@@ -1,8 +1,8 @@
 ﻿using CsvHelper;
 using Newtonsoft.Json;
+using NPOI.SS.UserModel;
 using NPOI.XSSF.UserModel;
 using System;
-using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Net.Http;
@@ -12,7 +12,14 @@ namespace AutoLoanEligibility
 {
     class Program
     {
+        #region Constants
+        const string Eligible = "Eligible";
+        const string Ineligible = "InEligible";
+        const string Unable = "UnableToDetermine";
+        #endregion
+
         static HttpClient client = new HttpClient();
+
         static void Main(string[] args)
         {
             string csvPath = "";
@@ -23,25 +30,22 @@ namespace AutoLoanEligibility
             }
 
             XSSFWorkbook workbook = new XSSFWorkbook();
-            var eligibleSheet = workbook.CreateSheet("Eligible");
-            var ineligibleSheet = workbook.CreateSheet("Ineligible");
-            var unableSheet = workbook.CreateSheet("UnableToDetermine");
+            ISheet eligibleSheet = workbook.CreateSheet(Eligible);
+            ISheet ineligibleSheet = workbook.CreateSheet(Ineligible);
+            ISheet unableSheet = workbook.CreateSheet(Unable);
+            int eligibleRow = 0;
+            int ineligibleRow = 0;
+            int unableRow = 0;
 
             using (StreamReader sr = new StreamReader(csvPath))
             using (var csv = new CsvReader(sr, CultureInfo.InvariantCulture))
             {
                 csv.Configuration.HasHeaderRecord = false;
-                var records = csv.GetRecords<CsvEntry>();
-                #region Excel output row numbers
-                int eligibleRow = 0;
-                int ineligibleRow = 0;
-                int unableRow = 0;
                 int total = 1;
-                #endregion
 
-                foreach (var record in records)
+                foreach (var record in csv.GetRecords<CsvEntry>())
                 {
-                    Console.WriteLine($"Checking address {total}");
+                    Console.WriteLine($"Checking address {total}");                   
                     Thread.Sleep(TimeSpan.FromSeconds(2)); // Prevent spamming requests
                     HttpResponseMessage response = client.GetAsync("https://eligibility.sc.egov.usda.gov/eligibility/MapAddressVerification?address=" + record.Address + "&whichapp=RBSIELG").GetAwaiter().GetResult();
                     if (!response.IsSuccessStatusCode)
@@ -53,30 +57,24 @@ namespace AutoLoanEligibility
                     }
 
                     EligibilityModel json = JsonConvert.DeserializeObject<EligibilityModel>(response.Content.ReadAsStringAsync().GetAwaiter().GetResult());
-                    if (json.EligibilityResult.Equals("InEligible"))
+                    if (json.EligibilityResult.Equals(Ineligible))
                     {
-                        var row = ineligibleSheet.CreateRow(ineligibleRow);
-                        row.CreateCell(0).SetCellValue(record.CompanyName);
-                        row.CreateCell(1).SetCellValue(record.Address);
+                        AddRecord(ineligibleSheet.CreateRow(ineligibleRow), record);
                         ineligibleRow++;
                     }
-                    else if (json.EligibilityResult.Equals("UnableToDetermine"))
+                    else if (json.EligibilityResult.Equals(Unable))
                     {
-                        var row = unableSheet.CreateRow(unableRow);
-                        row.CreateCell(0).SetCellValue(record.CompanyName);
-                        row.CreateCell(1).SetCellValue(record.Address);
+                        AddRecord(unableSheet.CreateRow(unableRow), record);
                         unableRow++;
                     }
-                    else
+                    else if (json.EligibilityResult.Equals(Eligible))
                     {
-                        var row = eligibleSheet.CreateRow(eligibleRow);
-                        row.CreateCell(0).SetCellValue(record.CompanyName);
-                        row.CreateCell(1).SetCellValue(record.Address);
+                        AddRecord(eligibleSheet.CreateRow(eligibleRow), record);
                         eligibleRow++;
                     }
                     total++;
                 }
-            }          
+            }
             FileStream fs = File.Create("output.xlsx");
             workbook.Write(fs);
             fs.Close();
@@ -84,6 +82,12 @@ namespace AutoLoanEligibility
             Console.WriteLine($"Output directory: {Directory.GetCurrentDirectory()}\\output.xlsx");
             Console.WriteLine("Press any key to close this window...");
             Console.ReadKey();
+        }
+
+        private static void AddRecord(IRow row, CsvEntry record)
+        {
+            row.CreateCell(0).SetCellValue(record.CompanyName);
+            row.CreateCell(1).SetCellValue(record.Address);
         }
     }
 }
